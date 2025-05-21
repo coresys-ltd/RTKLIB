@@ -194,6 +194,24 @@ int main(int argc, char **argv)
     int i,j,n=0,dispint=5000,trlevel=0,opts[]={10000,10000,2000,32768,10,0,30};
     int types[MAXSTR]={STR_FILE,STR_FILE},stat[MAXSTR]={0},byte[MAXSTR]={0};
     int bps[MAXSTR]={0},fmts[MAXSTR]={0},sta=0;
+
+    char *ntrip_user = NULL;
+    char *ntrip_pass = NULL;
+
+    FILE *fp = fopen(".str2str.conf", "r");
+    if (fp) {
+        char line[256];
+        while (fgets(line, sizeof(line), fp)) {
+            line[strcspn(line, "\r\n")] = 0; // remove newline
+            if (strncmp(line, "NTRIP_USER=", 11) == 0) {
+                ntrip_user = strdup(line + 11);
+            } else if (strncmp(line, "NTRIP_PASS=", 11) == 0) {
+                ntrip_pass = strdup(line + 11);
+            }
+        }
+        fclose(fp);
+    }
+
     
     for (i=0;i<MAXSTR;i++) paths[i]=s[i];
     
@@ -232,6 +250,17 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i],"-t"  )&&i+1<argc) trlevel=atoi(argv[++i]);
         else if (*argv[i]=='-') printhelp();
     }
+
+    // Inject credentials into ntrip://@host... style output URLs
+    for (i = 1; i <= n; i++) {
+        if (ntrip_user && ntrip_pass && strncmp(paths[i], "ntrip://@", 9) == 0) {
+            char newurl[1024];
+            snprintf(newurl, sizeof(newurl), "ntrip://%s:%s%s", ntrip_user, ntrip_pass, paths[i] + 8);
+            strncpy(paths[i], newurl, MAXSTRPATH - 1);
+            paths[i][MAXSTRPATH - 1] = '\0';  // ensure null-termination
+        }
+    }
+    
     if (n<=0) n=1; /* stdout */
     
     for (i=0;i<n;i++) {
